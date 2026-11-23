@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2a7f6f">
+<title>譯言 — 說中文，說英語</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background: #fdf8f2; color: #2b2b2b; min-height: 100vh; padding: 16px 16px 32px; }
+.wrap { max-width: 560px; margin: 0 auto; }
+header { text-align: center; margin: 8px 0 16px; }
+h1 { font-size: 30px; letter-spacing: 6px; color: #2a7f6f; }
+.sub { color: #777; font-size: 14px; margin-top: 4px; }
+.dir { display: flex; gap: 10px; margin-bottom: 14px; }
+.dir button { flex: 1; padding: 13px 4px; font-size: 15px; border: 2px solid #d8d2c8; background: #fff; border-radius: 14px; cursor: pointer; color: #555; }
+.dir button.active { border-color: #2a7f6f; background: #2a7f6f; color: #fff; font-weight: bold; }
+.status { text-align: center; min-height: 24px; font-size: 14px; color: #8a7a5c; margin-bottom: 6px; }
+.status.err { color: #c0392b; }
+.mic-row { text-align: center; margin: 10px 0 16px; }
+#micBtn { width: 96px; height: 96px; border-radius: 50%; border: none; background: #2a7f6f; color: #fff; font-size: 40px; cursor: pointer; box-shadow: 0 4px 14px rgba(42,127,111,.4); }
+#micBtn.listening { background: #c0392b; animation: pulse 1.2s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(192,57,43,.5); } 70% { box-shadow: 0 0 0 18px rgba(192,57,43,0); } 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0); } }
+.mic-hint { font-size: 13px; color: #888; margin-top: 8px; }
+.card { background: #fff; border: 1px solid #e8e0d4; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+.card .label { font-size: 12px; color: #999; letter-spacing: 2px; margin-bottom: 6px; }
+.card .text { font-size: 19px; line-height: 1.6; min-height: 30px; white-space: pre-wrap; word-break: break-word; }
+.card .text.placeholder { color: #bbb; font-size: 15px; }
+.card .text.interim { color: #888; }
+#dstText { color: #1a5c50; }
+.actions { display: flex; gap: 8px; margin-top: 10px; }
+.actions button { flex: 1; padding: 10px; font-size: 15px; border: 1px solid #d8d2c8; background: #faf6ef; border-radius: 10px; cursor: pointer; }
+.actions button:disabled { opacity: .4; }
+.type-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.type-row input { flex: 1; padding: 12px; font-size: 16px; border: 1px solid #d8d2c8; border-radius: 10px; background: #fff; }
+.type-row button { padding: 12px 18px; font-size: 16px; border: none; background: #2a7f6f; color: #fff; border-radius: 10px; cursor: pointer; }
+h2 { font-size: 16px; margin: 18px 0 10px; color: #555; }
+.hist-item { background: #fff; border: 1px solid #e8e0d4; border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; cursor: pointer; }
+.hist-item .s { font-size: 15px; }
+.hist-item .d { font-size: 15px; color: #1a5c50; margin-top: 2px; }
+.hist-item .t { font-size: 11px; color: #aaa; margin-top: 4px; }
+.empty { color: #aaa; font-size: 14px; text-align: center; padding: 12px; }
+details { background: #fff; border: 1px solid #e8e0d4; border-radius: 14px; padding: 14px 16px; margin-top: 18px; }
+summary { font-size: 16px; cursor: pointer; color: #555; }
+.set-row { margin-top: 14px; font-size: 15px; }
+.set-row label { display: block; margin-bottom: 6px; color: #555; }
+.set-row input[type=range] { width: 100%; }
+.set-row input[type=text], .set-row input[type=password], .set-row select { width: 100%; padding: 10px; font-size: 15px; border: 1px solid #d8d2c8; border-radius: 10px; background: #fff; }
+.set-row .note { font-size: 12px; color: #999; margin-top: 4px; line-height: 1.5; }
+.set-row button { padding: 10px 16px; font-size: 15px; border: 1px solid #d8d2c8; background: #faf6ef; border-radius: 10px; cursor: pointer; }
+#svcStatus { font-size: 14px; color: #1a5c50; margin-top: 6px; min-height: 20px; }
+footer { text-align: center; color: #bbb; font-size: 12px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>譯言</h1>
+<div class="sub">說中文，說英語，互相聽得懂</div>
+</header>
+
+<div class="dir">
+<button id="dirZhEn" class="active">中文 → English</button>
+<button id="dirEnZh">English → 中文</button>
+<button id="dirAuto">自動辨識</button>
+</div>
+
+<div class="status" id="status">準備好了，點麥克風開始說話</div>
+
+<div class="mic-row">
+<button id="micBtn" aria-label="開始說話">🎤</button>
+<div class="mic-hint" id="micHint">點一下開始聽，說完會自動停</div>
+</div>
+
+<div class="card">
+<div class="label" id="srcLabel">你說的（中文）</div>
+<div class="text placeholder" id="srcText">還沒有說話</div>
+</div>
+
+<div class="card">
+<div class="label" id="dstLabel">翻譯（English）</div>
+<div class="text placeholder" id="dstText">翻譯會出現在這裡</div>
+<div class="actions">
+<button id="speakBtn" disabled>🔊 再說一次</button>
+<button id="copyBtn" disabled>📋 複製翻譯</button>
+</div>
+</div>
+
+<div class="type-row">
+<input id="typeInput" type="text" placeholder="或直接打字翻譯…" autocomplete="off">
+<button id="typeBtn">翻譯</button>
+</div>
+
+<h2>記錄 <span style="font-weight:normal;font-size:12px;color:#aaa;">（點一筆可再聽一次翻譯）</span></h2>
+<div id="history"></div>
+
+<details>
+<summary>⚙️ 設定</summary>
+<div class="set-row">
+<label>朗讀語速：<span id="rateVal">1.0</span></label>
+<input type="range" id="rateRange" min="0.7" max="1.3" step="0.1" value="1.0">
+</div>
+<div class="set-row">
+<label><input type="checkbox" id="autoSpeak" checked> 翻譯完自動朗讀</label>
+</div>
+<div class="set-row">
+<label>翻譯服務</label>
+<div id="svcStatus">尚未使用</div>
+<button id="testBtn">測試翻譯服務</button>
+<div class="note">免費服務按順序嘗試：Google 翻譯 → MyMemory → LibreTranslate。哪個通就用哪個。</div>
+</div>
+<div class="set-row">
+<label>Groq 金鑰（自動辨識用，免費）</label>
+<input type="password" id="groqKey" placeholder="貼上 Groq API 金鑰" style="margin-top:8px;">
+<button id="saveGroqBtn" style="margin-top:8px;">儲存 Groq 金鑰</button>
+<div class="note">自動辨識用 Groq 的 Whisper 語音辨識，免費，在 console.groq.com 註冊取得金鑰，不用綁卡。金鑰只存在這支手機裡。</div>
+</div>
+<div class="set-row">
+<label>翻譯 API 金鑰（選填，免費服務不通時用）</label>
+<select id="apiProvider">
+<option value="">不使用金鑰</option>
+<option value="deepl">DeepL 免費版（每月 50 萬字元免費）</option>
+<option value="google">Google Cloud 翻譯</option>
+</select>
+<input type="password" id="apiKey" placeholder="貼上 API 金鑰" style="margin-top:8px;">
+<button id="saveKeyBtn" style="margin-top:8px;">儲存金鑰</button>
+<div class="note">金鑰只存在這支手機裡，不會傳到別的地方。DeepL 免費金鑰在 deepl.com 註冊取得；Google Cloud 翻譯需開通計費。</div>
+</div>
+<div class="set-row">
+<button id="clearHistBtn">清除全部記錄</button>
+</div>
+</details>
+
+<footer>譯言 v2 · 語音辨識與翻譯需要網路</footer>
+</div>
+
+<script>
+var LS_KEY = 'yiyan_v1';
+var state = { dir: 'zh-en', autoSpeak: true, rate: 1.0, apiProvider: '', apiKey: '', groqKey: '', service: '', history: [] };
+var turnDir = 'zh-en'; // auto 模式下，本輪辨識出的實際方向
+try { var saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); for (var k in saved) { if (k in state) state[k] = saved[k]; } } catch (e) {}
+function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
+
+var statusEl = document.getElementById('status');
+var srcTextEl = document.getElementById('srcText');
+var dstTextEl = document.getElementById('dstText');
+var micBtn = document.getElementById('micBtn');
+var speakBtn = document.getElementById('speakBtn');
+var copyBtn = document.getElementById('copyBtn');
+var currentDst = '';
+
+function setStatus(msg, isErr) {
+  statusEl.textContent = msg;
+  statusEl.className = 'status' + (isErr ? ' err' : '');
+}
+function setService(name) {
+  state.service = name;
+  document.getElementById('svcStatus').textContent = '目前使用：' + name;
+  save();
+}
+function effDir() { return state.dir === 'auto' ? turnDir : state.dir; }
+function zhEn() { return effDir() === 'zh-en'; }
+function srcLang() { return zhEn() ? 'zh-TW' : 'en-US'; }
+function dstLang() { return zhEn() ? 'en-US' : 'zh-TW'; }
+function updateAutoLabels() {
+  if (state.dir !== 'auto') return;
+  document.getElementById('srcLabel').textContent = turnDir === 'zh-en' ? '你說的（中文）' : 'You said (English)';
+  document.getElementById('dstLabel').textContent = turnDir === 'zh-en' ? '翻譯（English）' : '翻譯（中文）';
+}
+
+function applyDir() {
+  document.getElementById('dirZhEn').className = state.dir === 'zh-en' ? 'active' : '';
+  document.getElementById('dirEnZh').className = state.dir === 'en-zh' ? 'active' : '';
+  document.getElementById('dirAuto').className = state.dir === 'auto' ? 'active' : '';
+  if (state.dir === 'auto') {
+    document.getElementById('srcLabel').textContent = '你說的（自動辨識）';
+    document.getElementById('dstLabel').textContent = '翻譯';
+    document.getElementById('typeInput').placeholder = '或直接打字（自動辨識語言）…';
+    setStatus(state.groqKey ? '自動辨識：說中文或英語都可以' : '自動辨識需要免費的 Groq 金鑰，請在設定裡填入');
+  } else {
+    document.getElementById('srcLabel').textContent = zhEn() ? '你說的（中文）' : 'You said (English)';
+    document.getElementById('dstLabel').textContent = zhEn() ? '翻譯（English）' : '翻譯（中文）';
+    document.getElementById('typeInput').placeholder = zhEn() ? '或直接打中文翻譯…' : 'Or type English here…';
+    setStatus('準備好了，點麥克風開始說話');
+  }
+}
+document.getElementById('dirZhEn').onclick = function () { state.dir = 'zh-en'; save(); applyDir(); };
+document.getElementById('dirEnZh').onclick = function () { state.dir = 'en-zh'; save(); applyDir(); };
+document.getElementById('dirAuto').onclick = function () { state.dir = 'auto'; save(); applyDir(); };
+
+// ---------- translation ----------
+function fetchTimeout(url, opts, ms) {
+  ms = ms || 15000;
+  return new Promise(function (resolve, reject) {
+    var done = false;
+    var timer = setTimeout(function () { if (!done) { done = true; reject(new Error('連線逾時')); } }, ms);
+    fetch(url, opts).then(function (r) { if (!done) { done = true; clearTimeout(timer); resolve(r); } },
+      function (e) { if (!done) { done = true; clearTimeout(timer); reject(e); } });
+  });
+}
+function parseGtx(data) {
+  if (!Array.isArray(data) || !Array.isArray(data[0])) throw new Error('格式不對');
+  var out = data[0].map(function (s) { return s[0] || ''; }).join('');
+  if (!out) throw new Error('翻譯是空的');
+  return out;
+}
+async function trGoogle(text, from, to) {
+  var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + from + '&tl=' + to + '&dt=t&q=' + encodeURIComponent(text);
+  var res = await fetchTimeout(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return parseGtx(await res.json());
+}
+async function trMyMemory(text, from, to) {
+  var url = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(text) + '&langpair=' + from + '|' + to;
+  var res = await fetchTimeout(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  var data = await res.json();
+  var out = data && data.responseData && data.responseData.translatedText;
+  if (!out || /^MYMEMORY WARNING/i.test(out) || /QUERY LENGTH LIMIT/i.test(out)) throw new Error('今日免費額度用完或無結果');
+  return out;
+}
+async function trLibre(text, from, to) {
+  var res = await fetchTimeout('https://translate.argosopentech.com/translate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ q: text, source: from, target: to, format: 'text' })
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  var data = await res.json();
+  if (!data.translatedText) throw new Error('翻譯是空的');
+  return data.translatedText;
+}
+async function trDeepL(text, from, to, key) {
+  var res = await fetchTimeout('https://api-free.deepl.com/v2/translate', {
+    method: 'POST',
+    headers: { 'Authorization': 'DeepL-Auth-Key ' + key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: [text], source_lang: from, target_lang: to })
+  }, 20000);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  var data = await res.json();
+  if (!data.translations || !data.translations[0]) throw new Error('翻譯是空的');
+  return data.translations[0].text;
+}
+async function trGoogleAPI(text, from, to, key) {
+  var res = await fetchTimeout('https://translation.googleapis.com/language/translate/v2?key=' + encodeURIComponent(key), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ q: text, source: from, target: to, format: 'text' })
+  }, 20000);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  var data = await res.json();
+  if (!data.data || !data.data.translations || !data.data.translations[0]) throw new Error('翻譯是空的');
+  return data.data.translations[0].translatedText;
+}
+async function translate(text) {
+  var errors = [];
+  var z = zhEn();
+  if (state.apiKey && state.apiProvider === 'deepl') {
+    try { var t = await trDeepL(text, z ? 'ZH' : 'EN', z ? 'EN-US' : 'ZH', state.apiKey); setService('DeepL'); return t; }
+    catch (e) { errors.push('DeepL：' + e.message); }
+  }
+  if (state.apiKey && state.apiProvider === 'google') {
+    try { var t2 = await trGoogleAPI(text, z ? 'zh-TW' : 'en', z ? 'en' : 'zh-TW', state.apiKey); setService('Google 翻譯 API'); return t2; }
+    catch (e) { errors.push('Google API：' + e.message); }
+  }
+  var chain = [
+    ['Google 翻譯', function () { return trGoogle(text, z ? 'zh-TW' : 'en', z ? 'en' : 'zh-TW'); }],
+    ['MyMemory', function () { return trMyMemory(text, z ? 'zh-TW' : 'en', z ? 'en' : 'zh-TW'); }],
+    ['LibreTranslate', function () { return trLibre(text, z ? 'zh' : 'en', z ? 'en' : 'zh'); }]
+  ];
+  for (var i = 0; i < chain.length; i++) {
+    try { var out = await chain[i][1](); setService(chain[i][0]); return out; }
+    catch (e) { errors.push(chain[i][0] + '：' + e.message); }
+  }
+  throw new Error(errors.join('；'));
+}
+
+// ---------- speech ----------
+function pickVoice(lang) {
+  if (!('speechSynthesis' in window)) return null;
+  var voices = speechSynthesis.getVoices() || [];
+  var prefs = lang.indexOf('zh') === 0 ? ['zh-TW', 'zh-HK', 'zh-CN', 'zh'] : ['en-US', 'en-GB', 'en'];
+  for (var i = 0; i < prefs.length; i++) {
+    for (var j = 0; j < voices.length; j++) {
+      if (voices[j].lang && voices[j].lang.toLowerCase().indexOf(prefs[i].toLowerCase()) === 0) return voices[j];
+    }
+  }
+  return null;
+}
+function speak(text, lang) {
+  if (!('speechSynthesis' in window)) { setStatus('這支手機不支援語音朗讀', true); return; }
+  try {
+    speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(text);
+    u.lang = lang;
+    u.rate = state.rate;
+    var v = pickVoice(lang);
+    if (v) u.voice = v;
+    speechSynthesis.speak(u);
+  } catch (e) { setStatus('朗讀失敗：' + e.message, true); }
+}
+speakBtn.onclick = function () { if (currentDst) speak(currentDst, dstLang()); };
+copyBtn.onclick = function () {
+  if (!currentDst) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(currentDst).then(function () { setStatus('已複製翻譯'); }, function () { setStatus('複製失敗', true); });
+  } else { setStatus('這支手機不支援一鍵複製', true); }
+};
+
+// ---------- flow ----------
+function showSource(text, interim) {
+  srcTextEl.textContent = text;
+  srcTextEl.className = 'text' + (interim ? ' interim' : '');
+}
+function showDst(text) {
+  currentDst = text;
+  dstTextEl.textContent = text;
+  dstTextEl.className = 'text';
+  speakBtn.disabled = false;
+  copyBtn.disabled = false;
+}
+async function doTranslate(text) {
+  showSource(text, false);
+  setStatus('翻譯中…');
+  dstTextEl.textContent = '…';
+  dstTextEl.className = 'text placeholder';
+  try {
+    var out = await translate(text);
+    showDst(out);
+    addHistory(text, out);
+    setStatus('翻譯完成' + (state.service ? '（' + state.service + '）' : ''));
+    if (state.autoSpeak) speak(out, dstLang());
+  } catch (e) {
+    dstTextEl.textContent = '翻譯失敗';
+    dstTextEl.className = 'text placeholder';
+    setStatus('翻譯服務都連不上：' + e.message + '。可在設定裡填入免費的 DeepL 金鑰。', true);
+  }
+}
+function addHistory(src, dst) {
+  state.history.unshift({ dir: state.dir, src: src, dst: dst, t: Date.now() });
+  if (state.history.length > 30) state.history.length = 30;
+  save();
+  renderHistory();
+}
+function renderHistory() {
+  var box = document.getElementById('history');
+  if (!state.history.length) { box.innerHTML = '<div class="empty">還沒有記錄</div>'; return; }
+  box.innerHTML = '';
+  state.history.forEach(function (h) {
+    var d = document.createElement('div');
+    d.className = 'hist-item';
+    var time = new Date(h.t);
+    var ts = (time.getMonth() + 1) + '/' + time.getDate() + ' ' + ('0' + time.getHours()).slice(-2) + ':' + ('0' + time.getMinutes()).slice(-2);
+    d.innerHTML = '<div class="s">' + esc(h.src) + '</div><div class="d">→ ' + esc(h.dst) + '</div><div class="t">' + (h.dir === 'zh-en' ? '中 → 英' : '英 → 中') + ' · ' + ts + '</div>';
+    d.onclick = function () { speak(h.dst, h.dir === 'zh-en' ? 'en-US' : 'zh-TW'); };
+    box.appendChild(d);
+  });
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+// ---------- auto-detect mode (Groq Whisper) ----------
+function mapDetectedLang(lang) {
+  if (!lang) return null;
+  var l = String(lang).toLowerCase();
+  if (l === 'zh' || l === 'chinese' || l === 'mandarin' || l.indexOf('zh') === 0) return 'zh-en';
+  if (l === 'en' || l === 'english' || l.indexOf('en') === 0) return 'en-zh';
+  return null;
+}
+function detectTextLang(text) {
+  return /[\u4e00-\u9fff]/.test(text) ? 'zh-en' : 'en-zh';
+}
+async function transcribeGroq(blob) {
+  var fd = new FormData();
+  fd.append('file', blob, 'speech.webm');
+  fd.append('model', 'whisper-large-v3-turbo');
+  fd.append('response_format', 'verbose_json');
+  var res = await fetchTimeout('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + state.groqKey },
+    body: fd
+  }, 30000);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return await res.json();
+}
+
+var mediaRecorder = null, mediaStream = null, audioChunks = [], recStartTime = 0, audioCtx = null, silenceCheck = null;
+function startSilenceWatch(stream) {
+  function capOnly() {
+    silenceCheck = setInterval(function () {
+      if (Date.now() - recStartTime > 30000) stopAutoRec();
+    }, 500);
+  }
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.resume) audioCtx.resume();
+    var src = audioCtx.createMediaStreamSource(stream);
+    var analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    src.connect(analyser);
+    var data = new Uint8Array(analyser.fftSize);
+    var quietSince = null;
+    silenceCheck = setInterval(function () {
+      var elapsed = Date.now() - recStartTime;
+      if (elapsed > 30000) { stopAutoRec(); return; }
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      analyser.getByteTimeDomainData(data);
+      var sum = 0;
+      for (var i = 0; i < data.length; i++) { var v = (data[i] - 128) / 128; sum += v * v; }
+      var rms = Math.sqrt(sum / data.length);
+      if (rms < 0.02) {
+        if (quietSince === null) quietSince = Date.now();
+        if (elapsed > 1200 && Date.now() - quietSince > 1500) stopAutoRec();
+      } else {
+        quietSince = null;
+      }
+    }, 200);
+  } catch (e) { capOnly(); }
+}
+function stopSilenceWatch() {
+  if (silenceCheck) { clearInterval(silenceCheck); silenceCheck = null; }
+  if (audioCtx) { try { audioCtx.close(); } catch (e) {} audioCtx = null; }
+}
+function stopAutoRec() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') { try { mediaRecorder.stop(); } catch (e) {} }
+}
+async function autoListenToggle() {
+  if (listening && mediaRecorder && mediaRecorder.state !== 'inactive') { stopAutoRec(); return; }
+  if (!state.groqKey) { setStatus('自動辨識需要免費的 Groq 金鑰，請在設定裡填入', true); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { setStatus('這個瀏覽器不支援錄音', true); return; }
+  if (typeof MediaRecorder === 'undefined') { setStatus('這個瀏覽器不支援錄音', true); return; }
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    setStatus('麥克風權限被拒，請在瀏覽器設定裡允許麥克風', true);
+    return;
+  }
+  try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) {}
+  audioChunks = [];
+  var mime = '';
+  if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mime = 'audio/webm;codecs=opus';
+  else if (MediaRecorder.isTypeSupported('audio/webm')) mime = 'audio/webm';
+  try {
+    mediaRecorder = mime ? new MediaRecorder(mediaStream, { mimeType: mime }) : new MediaRecorder(mediaStream);
+  } catch (e) {
+    setStatus('無法開始錄音：' + e.message, true);
+    mediaStream.getTracks().forEach(function (t) { t.stop(); });
+    return;
+  }
+  mediaRecorder.ondataavailable = function (e) { if (e.data && e.data.size) audioChunks.push(e.data); };
+  mediaRecorder.onstop = async function () {
+    stopSilenceWatch();
+    if (mediaStream) mediaStream.getTracks().forEach(function (t) { t.stop(); });
+    setListening(false);
+    var blob = new Blob(audioChunks, { type: (mediaRecorder && mediaRecorder.mimeType) || 'audio/webm' });
+    if (!blob.size) { setStatus('沒錄到聲音，再試一次'); return; }
+    setStatus('辨識中…');
+    try {
+      var result = await transcribeGroq(blob);
+      var text = (result.text || '').trim();
+      var dir = mapDetectedLang(result.language);
+      if (!text) { setStatus('沒聽到聲音，再試一次'); return; }
+      if (!dir) { showSource(text, false); setStatus('聽到的是「' + (result.language || '未知語言') + '」，目前只支援中文和英語', true); return; }
+      turnDir = dir;
+      updateAutoLabels();
+      doTranslate(text);
+    } catch (e) {
+      setStatus('辨識失敗：' + e.message + '（請檢查 Groq 金鑰與網路）', true);
+    }
+  };
+  mediaRecorder.start();
+  recStartTime = Date.now();
+  startSilenceWatch(mediaStream);
+  setListening(true);
+  setStatus('正在聽…說中文或英語都可以');
+  showSource('…', true);
+}
+
+// ---------- recognition ----------
+var rec = null, listening = false;
+function setListening(on) {
+  listening = on;
+  micBtn.className = on ? 'listening' : '';
+  document.getElementById('micHint').textContent = on ? '正在聽…說完停下來即可，點一下可提早結束' : '點一下開始聽，說完會自動停';
+}
+micBtn.onclick = function () {
+  if (state.dir === 'auto') { autoListenToggle(); return; }
+  if (listening && rec) { try { rec.stop(); } catch (e) {} return; }
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { setStatus('這個瀏覽器不支援語音辨識，請用 Chrome 開啟', true); return; }
+  try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) {}
+  rec = new SR();
+  rec.lang = srcLang();
+  rec.interimResults = true;
+  rec.continuous = false;
+  rec.maxAlternatives = 1;
+  var finalText = '';
+  rec.onresult = function (e) {
+    var interim = '';
+    for (var i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    showSource(finalText + interim, !finalText);
+  };
+  rec.onend = function () {
+    setListening(false);
+    if (finalText.trim()) doTranslate(finalText.trim());
+    else setStatus('沒聽到聲音，再試一次');
+  };
+  rec.onerror = function (e) {
+    setListening(false);
+    var m = '語音辨識失敗';
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') m = '麥克風權限被拒，請在瀏覽器設定裡允許麥克風';
+    else if (e.error === 'no-speech') m = '沒聽到聲音，再試一次';
+    else if (e.error === 'network') m = '語音辨識需要網路，請檢查連線';
+    else if (e.error === 'aborted') return;
+    else m = '語音辨識失敗：' + e.error;
+    setStatus(m, true);
+  };
+  try {
+    rec.start();
+    setListening(true);
+    setStatus('正在聽…（' + (zhEn() ? '中文' : 'English') + '）');
+    showSource('…', true);
+  } catch (e) { setStatus('無法開始辨識：' + e.message, true); }
+};
+
+// ---------- typed input ----------
+function submitTyped() {
+  var v = document.getElementById('typeInput').value.trim();
+  if (!v) return;
+  if (state.dir === 'auto') { turnDir = detectTextLang(v); updateAutoLabels(); }
+  doTranslate(v);
+}
+document.getElementById('typeBtn').onclick = submitTyped;
+document.getElementById('typeInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') submitTyped();
+});
+
+// ---------- settings ----------
+var rateRange = document.getElementById('rateRange');
+rateRange.value = state.rate;
+document.getElementById('rateVal').textContent = state.rate.toFixed(1);
+rateRange.oninput = function () { state.rate = parseFloat(rateRange.value); document.getElementById('rateVal').textContent = state.rate.toFixed(1); save(); };
+var autoEl = document.getElementById('autoSpeak');
+autoEl.checked = state.autoSpeak;
+autoEl.onchange = function () { state.autoSpeak = autoEl.checked; save(); };
+document.getElementById('apiProvider').value = state.apiProvider;
+document.getElementById('apiKey').value = state.apiKey;
+document.getElementById('groqKey').value = state.groqKey || '';
+document.getElementById('saveGroqBtn').onclick = function () {
+  state.groqKey = document.getElementById('groqKey').value.trim();
+  save();
+  applyDir();
+  setStatus(state.groqKey ? 'Groq 金鑰已儲存（只存在這支手機），自動辨識可以用了' : '已清除 Groq 金鑰');
+};
+document.getElementById('saveKeyBtn').onclick = function () {
+  state.apiProvider = document.getElementById('apiProvider').value;
+  state.apiKey = document.getElementById('apiKey').value.trim();
+  save();
+  setStatus(state.apiKey ? '金鑰已儲存（只存在這支手機）' : '已清除金鑰，改用免費服務');
+};
+document.getElementById('clearHistBtn').onclick = function () { state.history = []; save(); renderHistory(); setStatus('記錄已清除'); };
+document.getElementById('testBtn').onclick = async function () {
+  var sample = zhEn() ? '你好，我想去火車站' : 'Hello, I would like to go to the train station';
+  document.getElementById('svcStatus').textContent = '測試中…';
+  try {
+    var out = await translate(sample);
+    document.getElementById('svcStatus').textContent = '測試成功（' + state.service + '）：' + out;
+  } catch (e) {
+    document.getElementById('svcStatus').textContent = '免費服務都連不上：' + e.message;
+  }
+};
+
+// ---------- init ----------
+if (state.service) document.getElementById('svcStatus').textContent = '上次使用：' + state.service;
+applyDir();
+renderHistory();
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
