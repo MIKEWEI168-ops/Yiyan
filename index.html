@@ -24,6 +24,8 @@ h1 { font-size: 30px; letter-spacing: 6px; color: #2a7f6f; }
 #micBtn.listening { background: #c0392b; animation: pulse 1.2s infinite; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(192,57,43,.5); } 70% { box-shadow: 0 0 0 18px rgba(192,57,43,0); } 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0); } }
 .mic-hint { font-size: 13px; color: #888; margin-top: 8px; }
+.scan-row { text-align: center; margin: 0 0 16px; }
+#scanBtn { padding: 12px 24px; font-size: 16px; border: 2px solid #2a7f6f; background: #fff; color: #2a7f6f; border-radius: 12px; cursor: pointer; font-weight: bold; }
 .card { background: #fff; border: 1px solid #e8e0d4; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
 .card .label { font-size: 12px; color: #999; letter-spacing: 2px; margin-bottom: 6px; }
 .card .text { font-size: 19px; line-height: 1.6; min-height: 30px; white-space: pre-wrap; word-break: break-word; }
@@ -74,6 +76,11 @@ footer { text-align: center; color: #bbb; font-size: 12px; margin-top: 24px; }
 <div class="mic-hint" id="micHint">點一下開始聽，說完會自動停</div>
 </div>
 
+<div class="scan-row">
+<button id="scanBtn">📄 掃描文件翻譯</button>
+<input type="file" id="scanInput" accept="image/*" style="display:none;">
+</div>
+
 <div class="card">
 <div class="label" id="srcLabel">你說的（中文）</div>
 <div class="text placeholder" id="srcText">還沒有說話</div>
@@ -118,6 +125,37 @@ footer { text-align: center; color: #bbb; font-size: 12px; margin-top: 24px; }
 <div class="note">自動辨識用 Groq 的 Whisper 語音辨識，免費，在 console.groq.com 註冊取得金鑰，不用綁卡。金鑰只存在這支手機裡。</div>
 </div>
 <div class="set-row">
+<label>ElevenLabs 金鑰（用自己的聲音朗讀，選填）</label>
+<input type="password" id="elKey" placeholder="貼上 ElevenLabs API 金鑰" style="margin-top:8px;">
+<button id="saveElBtn" style="margin-top:8px;">儲存金鑰</button>
+<div id="elQuota" class="note"></div>
+<div class="note">用自己的聲音唸翻譯，需要 ElevenLabs 的聲音複製。最新價格：免費版每月 1 萬字元朗讀（系統聲音）；聲音複製在 Starter 方案（約每月 6 美元）起。如果你的免費帳號能建立複製，這裡就能直接用。金鑰只存在這支手機裡。</div>
+</div>
+<div class="set-row">
+<label>中文說話者的聲音（翻成英文時，用這個聲音唸）</label>
+<div id="voiceZhStatus" class="note">尚未建立</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+<button id="recZhBtn">🎙️ 錄聲音樣本</button>
+<button id="makeZhBtn" disabled>建立聲音複製</button>
+<button id="testZhBtn" disabled>試聽</button>
+<button id="clearZhBtn" disabled>清除</button>
+</div>
+<input type="text" id="voiceZhId" placeholder="或直接貼上 voice_id（在 ElevenLabs 網站建立的）" style="margin-top:8px;">
+<div class="note">錄樣本：說中文，至少 30 秒，最好 1 分鐘，清楚自然就好。</div>
+</div>
+<div class="set-row">
+<label>英文說話者的聲音（翻成中文時，用這個聲音唸）</label>
+<div id="voiceEnStatus" class="note">尚未建立</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+<button id="recEnBtn">🎙️ 錄聲音樣本</button>
+<button id="makeEnBtn" disabled>建立聲音複製</button>
+<button id="testEnBtn" disabled>試聽</button>
+<button id="clearEnBtn" disabled>清除</button>
+</div>
+<input type="text" id="voiceEnId" placeholder="或直接貼上 voice_id（在 ElevenLabs 網站建立的）" style="margin-top:8px;">
+<div class="note">錄樣本：說英文，至少 30 秒，最好 1 分鐘，清楚自然就好。</div>
+</div>
+<div class="set-row">
 <label>翻譯 API 金鑰（選填，免費服務不通時用）</label>
 <select id="apiProvider">
 <option value="">不使用金鑰</option>
@@ -133,12 +171,12 @@ footer { text-align: center; color: #bbb; font-size: 12px; margin-top: 24px; }
 </div>
 </details>
 
-<footer>譯言 v2 · 語音辨識與翻譯需要網路</footer>
+<footer>譯言 v3 · 語音辨識與翻譯需要網路</footer>
 </div>
 
 <script>
 var LS_KEY = 'yiyan_v1';
-var state = { dir: 'zh-en', autoSpeak: true, rate: 1.0, apiProvider: '', apiKey: '', groqKey: '', service: '', history: [] };
+var state = { dir: 'zh-en', autoSpeak: true, rate: 1.0, apiProvider: '', apiKey: '', groqKey: '', elKey: '', voiceZhId: '', voiceEnId: '', service: '', history: [] };
 var turnDir = 'zh-en'; // auto 模式下，本輪辨識出的實際方向
 try { var saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); for (var k in saved) { if (k in state) state[k] = saved[k]; } } catch (e) {}
 function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
@@ -252,15 +290,16 @@ async function trGoogleAPI(text, from, to, key) {
   if (!data.data || !data.data.translations || !data.data.translations[0]) throw new Error('翻譯是空的');
   return data.data.translations[0].translatedText;
 }
+function fin(t) { return zhEn() ? t : s2t(t); }
 async function translate(text) {
   var errors = [];
   var z = zhEn();
   if (state.apiKey && state.apiProvider === 'deepl') {
-    try { var t = await trDeepL(text, z ? 'ZH' : 'EN', z ? 'EN-US' : 'ZH', state.apiKey); setService('DeepL'); return t; }
+    try { var t = await trDeepL(text, z ? 'ZH' : 'EN', z ? 'EN-US' : 'ZH-HANT', state.apiKey); setService('DeepL'); return fin(t); }
     catch (e) { errors.push('DeepL：' + e.message); }
   }
   if (state.apiKey && state.apiProvider === 'google') {
-    try { var t2 = await trGoogleAPI(text, z ? 'zh-TW' : 'en', z ? 'en' : 'zh-TW', state.apiKey); setService('Google 翻譯 API'); return t2; }
+    try { var t2 = await trGoogleAPI(text, z ? 'zh-TW' : 'en', z ? 'en' : 'zh-TW', state.apiKey); setService('Google 翻譯 API'); return fin(t2); }
     catch (e) { errors.push('Google API：' + e.message); }
   }
   var chain = [
@@ -269,10 +308,21 @@ async function translate(text) {
     ['LibreTranslate', function () { return trLibre(text, z ? 'zh' : 'en', z ? 'en' : 'zh'); }]
   ];
   for (var i = 0; i < chain.length; i++) {
-    try { var out = await chain[i][1](); setService(chain[i][0]); return out; }
+    try { var out = await chain[i][1](); setService(chain[i][0]); return fin(out); }
     catch (e) { errors.push(chain[i][0] + '：' + e.message); }
   }
   throw new Error(errors.join('；'));
+}
+
+// ---------- 簡轉繁（給回簡體的翻譯服務用） ----------
+var S2T_WORDS = [["头发","頭髮"],["发现","發現"],["发生","發生"],["发言","發言"],["发展","發展"],["发明","發明"],["发烧","發燒"],["发财","發財"],["理发","理髮"],["脱发","脫髮"],["干杯","乾杯"],["干净","乾淨"],["干燥","乾燥"],["干部","幹部"],["干活","幹活"],["钟表","鐘錶"],["闹钟","鬧鐘"],["时钟","時鐘"],["分钟","分鐘"],["一会儿","一會兒"],["面条","麵條"],["面包","麵包"],["面粉","麵粉"],["里面","裡面"],["然后","然後"],["以后","以後"],["之后","之後"],["于是","於是"],["对于","對於"],["关于","關於"],["由于","由於"],["至于","至於"],["音乐","音樂"],["快乐","快樂"],["乐意","樂意"],["尽力","盡力"],["尽管","儘管"],["尽量","盡量"],["积累","積累"],["劳累","勞累"],["其余","其餘"],["多余","多餘"],["业余","業餘"],["咸水","鹹水"],["咸菜","鹹菜"]];
+var S2T_MAP = {"说":"說","话":"話","国":"國","学":"學","时":"時","来":"來","对":"對","让":"讓","过":"過","还":"還","进":"進","远":"遠","运":"運","动":"動","车":"車","马":"馬","门":"門","问":"問","间":"間","见":"見","觉":"覺","电":"電","读":"讀","书":"書","买":"買","卖":"賣","长":"長","头":"頭","银":"銀","钱":"錢","铁":"鐵","钢":"鋼","阳":"陽","阴":"陰","云":"雲","汉":"漢","语":"語","听":"聽","讲":"講","谢":"謝","请":"請","没":"沒","点":"點","现":"現","线":"線","亲":"親","观":"觀","实":"實","际":"際","标":"標","爱":"愛","碍":"礙","众":"眾","优":"優","会":"會","伟":"偉","传":"傳","伤":"傷","伦":"倫","伪":"偽","体":"體","佣":"傭","侧":"側","侨":"僑","俭":"儉","债":"債","储":"儲","儿":"兒","兰":"蘭","关":"關","兴":"興","养":"養","兽":"獸","内":"內","册":"冊","写":"寫","军":"軍","农":"農","冻":"凍","净":"淨","凉":"涼","几":"幾","凤":"鳳","凭":"憑","凯":"凱","击":"擊","刘":"劉","则":"則","刚":"剛","创":"創","删":"刪","别":"別","制":"製","剂":"劑","劲":"勁","劳":"勞","势":"勢","励":"勵","医":"醫","华":"華","单":"單","卫":"衛","压":"壓","县":"縣","参":"參","变":"變","叙":"敘","叠":"疊","叶":"葉","号":"號","叹":"嘆","员":"員","咏":"詠","响":"響","哑":"啞","哗":"嘩","唠":"嘮","啸":"嘯","喷":"噴","嘱":"囑","团":"團","园":"園","图":"圖","圆":"圓","圣":"聖","场":"場","坛":"壇","坝":"壩","块":"塊","坚":"堅","坏":"壞","壳":"殼","处":"處","备":"備","复":"復","够":"夠","夹":"夾","夺":"奪","奋":"奮","奖":"獎","妇":"婦","妈":"媽","娄":"婁","娇":"嬌","娱":"娛","婴":"嬰","孙":"孫","宠":"寵","审":"審","宪":"憲","宫":"宮","宽":"寬","宾":"賓","宝":"寶","导":"導","寻":"尋","尽":"盡","层":"層","届":"屆","属":"屬","屡":"屢","屿":"嶼","岁":"歲","岂":"豈","岗":"崗","岛":"島","岭":"嶺","岳":"嶽","峦":"巒","峡":"峽","崭":"嶄","师":"師","币":"幣","帮":"幫","帐":"帳","带":"帶","帘":"簾","帜":"幟","异":"異","弃":"棄","张":"張","弯":"彎","弹":"彈","弥":"彌","归":"歸","当":"當","录":"錄","彻":"徹","态":"態","怀":"懷","忧":"憂","怜":"憐","总":"總","恳":"懇","恋":"戀","恒":"恆","恺":"愷","惧":"懼","惨":"慘","惯":"慣","愿":"願","慷":"慷","恼":"惱","惊":"驚","惩":"懲","悬":"懸","恶":"惡","惫":"憊","户":"戶","扎":"紮","扑":"撲","扰":"擾","扩":"擴","扫":"掃","扬":"揚","抠":"摳","抡":"掄","抢":"搶","护":"護","报":"報","担":"擔","拟":"擬","拢":"攏","拥":"擁","拦":"攔","拣":"揀","换":"換","挣":"掙","挤":"擠","挥":"揮","挚":"摯","捞":"撈","损":"損","捡":"撿","掷":"擲","掸":"撣","掺":"摻","探":"探","揽":"攬","摇":"搖","搅":"攪","搀":"攙","搞":"搞","摧":"摧","摩":"摩","撵":"攆","撬":"撬","播":"播","撮":"撮","撼":"撼","擂":"擂","操":"操","擎":"擎","摆":"擺","斓":"斕","断":"斷","斋":"齋","无":"無","旧":"舊","归":"歸","显":"顯","晓":"曉","晕":"暈","晚":"晚","暂":"暫","术":"術","机":"機","杀":"殺","杂":"雜","权":"權","条":"條","来":"來","杨":"楊","杰":"傑","极":"極","构":"構","枭":"梟","枪":"槍","枫":"楓","柜":"櫃","柠":"檸","树":"樹","桥":"橋","桩":"樁","梦":"夢","检":"檢","楼":"樓","概":"概","榨":"榨","横":"橫","档":"檔","樱":"櫻","欢":"歡","欧":"歐","钦":"欽","残":"殘","毙":"斃","毕":"畢","毡":"氈","气":"氣","汤":"湯","沟":"溝","沪":"滬","沥":"瀝","沦":"淪","沧":"滄","浅":"淺","浆":"漿","浇":"澆","浓":"濃","涛":"濤","涝":"澇","测":"測","游":"遊","湾":"灣","湿":"濕","济":"濟","涩":"澀","渊":"淵","渗":"滲","温":"溫","溃":"潰","溅":"濺","澜":"瀾","潜":"潛","润":"潤","涧":"澗","涨":"漲","渐":"漸","潍":"濰","泽":"澤","澈":"澈","澎":"澎","澹":"澹","激":"激","渔":"漁"};
+function s2t(text) {
+  var out = text;
+  for (var i = 0; i < S2T_WORDS.length; i++) { out = out.split(S2T_WORDS[i][0]).join(S2T_WORDS[i][1]); }
+  var res = '';
+  for (var j = 0; j < out.length; j++) { var c = out[j]; res += S2T_MAP[c] || c; }
+  return res;
 }
 
 // ---------- speech ----------
@@ -299,13 +349,191 @@ function speak(text, lang) {
     speechSynthesis.speak(u);
   } catch (e) { setStatus('朗讀失敗：' + e.message, true); }
 }
-speakBtn.onclick = function () { if (currentDst) speak(currentDst, dstLang()); };
+speakBtn.onclick = function () { if (currentDst) speakTranslation(currentDst, dstLang()); };
 copyBtn.onclick = function () {
   if (!currentDst) return;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(currentDst).then(function () { setStatus('已複製翻譯'); }, function () { setStatus('複製失敗', true); });
   } else { setStatus('這支手機不支援一鍵複製', true); }
 };
+
+// ---------- ElevenLabs same-voice ----------
+var audioEl = null;
+function playBlob(blob) {
+  return new Promise(function (resolve) {
+    try { if (audioEl) audioEl.pause(); } catch (e) {}
+    var url = URL.createObjectURL(blob);
+    audioEl = new Audio(url);
+    var done = function () { try { URL.revokeObjectURL(url); } catch (e) {} resolve(); };
+    audioEl.onended = done;
+    audioEl.onerror = done;
+    audioEl.play().catch(done);
+  });
+}
+async function elTTS(text, voiceId) {
+  var res = await fetchTimeout('https://api.elevenlabs.io/v1/text-to-speech/' + encodeURIComponent(voiceId), {
+    method: 'POST',
+    headers: { 'xi-api-key': state.elKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: text, model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.75 } })
+  }, 30000);
+  if (!res.ok) {
+    var msg = 'HTTP ' + res.status;
+    try { var d = await res.json(); if (d && d.detail) msg = (typeof d.detail === 'string' ? d.detail : (d.detail.message || msg)); } catch (e) {}
+    throw new Error(msg);
+  }
+  return await res.blob();
+}
+async function speakTranslation(text, lang) {
+  var voiceId = lang.indexOf('en') === 0 ? state.voiceZhId : state.voiceEnId;
+  if (state.elKey && voiceId) {
+    try {
+      var blob = await elTTS(text, voiceId);
+      await playBlob(blob);
+      return;
+    } catch (e) {
+      setStatus('複製聲音朗讀失敗（' + e.message + '），改用系統聲音', true);
+    }
+  }
+  speak(text, lang);
+}
+async function fetchElQuota() {
+  if (!state.elKey) return;
+  try {
+    var res = await fetchTimeout('https://api.elevenlabs.io/v1/user/subscription', { headers: { 'xi-api-key': state.elKey } }, 15000);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var d = await res.json();
+    var used = d.character_count || 0, limit = d.character_limit || 0;
+    document.getElementById('elQuota').textContent = '剩餘額度：' + (limit - used).toLocaleString() + ' / ' + limit.toLocaleString() + ' 字元（每月）';
+  } catch (e) {
+    document.getElementById('elQuota').textContent = '查詢額度失敗：' + e.message;
+  }
+}
+
+// ---------- voice profiles (record sample -> clone) ----------
+var voiceSamples = { zh: null, en: null };
+var voiceRec = null, voiceRecStream = null, voiceRecProfile = null, voiceRecTimer = null, voiceRecStart = 0, voiceRecChunks = [];
+function voiceEls(p) {
+  var s = p === 'zh' ? 'Zh' : 'En';
+  return {
+    status: document.getElementById('voice' + s + 'Status'),
+    recBtn: document.getElementById('rec' + s + 'Btn'),
+    makeBtn: document.getElementById('make' + s + 'Btn'),
+    testBtn: document.getElementById('test' + s + 'Btn'),
+    clearBtn: document.getElementById('clear' + s + 'Btn'),
+    idInput: document.getElementById('voice' + s + 'Id')
+  };
+}
+function refreshVoiceUI(p) {
+  var els = voiceEls(p);
+  var id = p === 'zh' ? state.voiceZhId : state.voiceEnId;
+  var hasSample = !!voiceSamples[p];
+  els.makeBtn.disabled = !hasSample || !state.elKey;
+  els.testBtn.disabled = !id || !state.elKey;
+  els.clearBtn.disabled = !id && !hasSample;
+  els.idInput.value = id || '';
+  if (id) els.status.textContent = '已建立聲音複製 ✓（voice_id：' + id.slice(0, 8) + '…）';
+  else if (hasSample) els.status.textContent = '樣本已錄好，按「建立聲音複製」上傳';
+  else els.status.textContent = '尚未建立：先錄一段聲音樣本（至少 30 秒，最好 1 分鐘）';
+}
+function fmtSecs(s) { return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+function encodeWAV(audioBuffer) {
+  var len = audioBuffer.length, rate = audioBuffer.sampleRate;
+  var ch0 = audioBuffer.getChannelData(0);
+  var ch1 = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : ch0;
+  var buf = new ArrayBuffer(44 + len * 2);
+  var v = new DataView(buf);
+  function str(off, s) { for (var i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); }
+  str(0, 'RIFF'); v.setUint32(4, 36 + len * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, len * 2, true);
+  for (var i = 0; i < len; i++) {
+    var s = Math.max(-1, Math.min(1, (ch0[i] + ch1[i]) / 2));
+    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+async function blobToWav(blob) {
+  var AC = window.AudioContext || window.webkitAudioContext;
+  var ctx = new AC();
+  try {
+    var ab = await blob.arrayBuffer();
+    var decoded = await ctx.decodeAudioData(ab);
+    return encodeWAV(decoded);
+  } finally { try { ctx.close(); } catch (e) {} }
+}
+async function toggleVoiceRec(p) {
+  if (voiceRec && voiceRec.state !== 'inactive' && voiceRecProfile === p) { stopVoiceRec(); return; }
+  if (voiceRec && voiceRec.state !== 'inactive') { setStatus('先停下另一邊的錄音', true); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') { setStatus('這個瀏覽器不支援錄音', true); return; }
+  var els = voiceEls(p);
+  try { voiceRecStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { setStatus('麥克風權限被拒，請在瀏覽器設定裡允許麥克風', true); return; }
+  voiceRecChunks = [];
+  voiceRecProfile = p;
+  try { voiceRec = new MediaRecorder(voiceRecStream); }
+  catch (e) { setStatus('無法開始錄音：' + e.message, true); voiceRecStream.getTracks().forEach(function (t) { t.stop(); }); return; }
+  voiceRec.ondataavailable = function (e) { if (e.data && e.data.size) voiceRecChunks.push(e.data); };
+  voiceRec.onstop = async function () {
+    if (voiceRecTimer) { clearInterval(voiceRecTimer); voiceRecTimer = null; }
+    if (voiceRecStream) voiceRecStream.getTracks().forEach(function (t) { t.stop(); });
+    els.recBtn.textContent = '🎙️ 錄聲音樣本';
+    var secs = Math.round((Date.now() - voiceRecStart) / 1000);
+    var blob = new Blob(voiceRecChunks, { type: (voiceRec && voiceRec.mimeType) || 'audio/webm' });
+    voiceRec = null;
+    if (!blob.size || secs < 10) { els.status.textContent = '錄得太短，請至少錄 30 秒'; return; }
+    els.status.textContent = '正在轉換音檔…';
+    try {
+      voiceSamples[p] = await blobToWav(blob);
+      els.status.textContent = '樣本已錄好（' + fmtSecs(secs) + '），按「建立聲音複製」上傳';
+    } catch (e) {
+      els.status.textContent = '音檔轉換失敗：' + e.message;
+    }
+    refreshVoiceUI(p);
+  };
+  voiceRec.start();
+  voiceRecStart = Date.now();
+  els.recBtn.textContent = '⏹ 停止錄音';
+  voiceRecTimer = setInterval(function () {
+    var secs = Math.round((Date.now() - voiceRecStart) / 1000);
+    els.status.textContent = '錄音中 ' + fmtSecs(secs) + '（至少 30 秒，' + (secs >= 30 ? '可以停止了' : '請繼續說') + '）';
+    if (secs >= 120) stopVoiceRec();
+  }, 500);
+}
+function stopVoiceRec() {
+  if (voiceRec && voiceRec.state !== 'inactive') { try { voiceRec.stop(); } catch (e) {} }
+}
+async function makeVoice(p) {
+  var els = voiceEls(p);
+  if (!voiceSamples[p]) { els.status.textContent = '請先錄聲音樣本'; return; }
+  if (!state.elKey) { els.status.textContent = '請先填 ElevenLabs 金鑰'; return; }
+  els.status.textContent = '正在建立聲音複製…';
+  els.makeBtn.disabled = true;
+  try {
+    var fd = new FormData();
+    fd.append('name', p === 'zh' ? '譯言-中文說話者' : '譯言-英文說話者');
+    fd.append('files', voiceSamples[p], 'sample.wav');
+    fd.append('description', 'Created in 譯言 app');
+    var res = await fetchTimeout('https://api.elevenlabs.io/v1/voices/add', {
+      method: 'POST',
+      headers: { 'xi-api-key': state.elKey },
+      body: fd
+    }, 60000);
+    if (!res.ok) {
+      var msg = 'HTTP ' + res.status;
+      try { var d = await res.json(); if (d && d.detail) msg = (typeof d.detail === 'string' ? d.detail : (d.detail.message || msg)); } catch (e) {}
+      throw new Error(msg);
+    }
+    var data = await res.json();
+    if (!data.voice_id) throw new Error('沒有回傳 voice_id');
+    if (p === 'zh') state.voiceZhId = data.voice_id; else state.voiceEnId = data.voice_id;
+    save();
+    els.status.textContent = '聲音複製建立好了 ✓';
+  } catch (e) {
+    els.status.textContent = '建立失敗：' + e.message + '（免費版可能不含聲音複製，需 Starter 方案）';
+  }
+  refreshVoiceUI(p);
+}
 
 // ---------- flow ----------
 function showSource(text, interim) {
@@ -329,7 +557,7 @@ async function doTranslate(text) {
     showDst(out);
     addHistory(text, out);
     setStatus('翻譯完成' + (state.service ? '（' + state.service + '）' : ''));
-    if (state.autoSpeak) speak(out, dstLang());
+    if (state.autoSpeak) speakTranslation(out, dstLang());
   } catch (e) {
     dstTextEl.textContent = '翻譯失敗';
     dstTextEl.className = 'text placeholder';
@@ -352,7 +580,7 @@ function renderHistory() {
     var time = new Date(h.t);
     var ts = (time.getMonth() + 1) + '/' + time.getDate() + ' ' + ('0' + time.getHours()).slice(-2) + ':' + ('0' + time.getMinutes()).slice(-2);
     d.innerHTML = '<div class="s">' + esc(h.src) + '</div><div class="d">→ ' + esc(h.dst) + '</div><div class="t">' + (h.dir === 'zh-en' ? '中 → 英' : '英 → 中') + ' · ' + ts + '</div>';
-    d.onclick = function () { speak(h.dst, h.dir === 'zh-en' ? 'en-US' : 'zh-TW'); };
+    d.onclick = function () { speakTranslation(h.dst, h.dir === 'zh-en' ? 'en-US' : 'zh-TW'); };
     box.appendChild(d);
   });
 }
@@ -475,6 +703,116 @@ async function autoListenToggle() {
   showSource('…', true);
 }
 
+// ---------- document scan (Tesseract.js OCR) ----------
+function loadTesseract() {
+  return new Promise(function (resolve, reject) {
+    if (typeof Tesseract !== 'undefined') { resolve(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js';
+    s.onload = function () { resolve(); };
+    s.onerror = function () { reject(new Error('無法載入辨識套件')); };
+    document.head.appendChild(s);
+  });
+}
+var ocrWorker = null;
+async function getOcrWorker() {
+  if (ocrWorker) return ocrWorker;
+  await loadTesseract();
+  ocrWorker = await Tesseract.createWorker('chi_tra+eng', 1, { logger: function (m) {
+    if (m.status === 'recognizing text') setStatus('辨識中… ' + Math.round(m.progress * 100) + '%');
+    else if (m.status === 'loading tesseract core' || m.status === 'loading language traineddata') setStatus('首次使用，正在下載辨識資料…');
+  }});
+  return ocrWorker;
+}
+function compressImage(file) {
+  return new Promise(function (res) {
+    var img = new Image();
+    var u = URL.createObjectURL(file);
+    img.onload = function () {
+      URL.revokeObjectURL(u);
+      var MAX = 1600, w = img.naturalWidth, h = img.naturalHeight;
+      var sc = Math.min(1, MAX / Math.max(w, h));
+      w = Math.round(w * sc); h = Math.round(h * sc);
+      var cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      cv.toBlob(function (b) { res(b || file); }, 'image/jpeg', 0.82);
+    };
+    img.onerror = function () { URL.revokeObjectURL(u); res(file); };
+    img.src = u;
+  });
+}
+function enhanceImage(blob) {
+  return new Promise(function (res) {
+    var img = new Image();
+    var u = URL.createObjectURL(blob);
+    img.onload = function () {
+      URL.revokeObjectURL(u);
+      var MAXW = 2400, sc = Math.min(2, MAXW / img.naturalWidth);
+      if (sc < 1) sc = 1;
+      var cv = document.createElement('canvas');
+      cv.width = Math.round(img.naturalWidth * sc); cv.height = Math.round(img.naturalHeight * sc);
+      var cx = cv.getContext('2d');
+      cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
+      cx.drawImage(img, 0, 0, cv.width, cv.height);
+      try {
+        var id = cx.getImageData(0, 0, cv.width, cv.height), d = id.data;
+        for (var i = 0; i < d.length; i += 4) {
+          var g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          g = g < 150 ? Math.max(0, g * 0.5) : Math.min(255, 255 - (255 - g) * 0.5);
+          d[i] = g; d[i + 1] = g; d[i + 2] = g;
+        }
+        cx.putImageData(id, 0, 0);
+      } catch (e) {}
+      cv.toBlob(function (b) { res(b || blob); }, 'image/png');
+    };
+    img.onerror = function () { URL.revokeObjectURL(u); res(blob); };
+    img.src = u;
+  });
+}
+function ocrScore(text) {
+  var t = text || '';
+  var cjk = (t.match(/[\u4e00-\u9fff]/g) || []).length;
+  var syms = (t.match(/[^A-Za-z0-9\u4e00-\u9fff\s]/g) || []).length;
+  var words = (t.match(/[A-Za-z]{2,}/g) || []).length;
+  return cjk * 3 + words * 2 - syms * 2;
+}
+function pickBetter(t1, c1, t2, c2) {
+  if (typeof c1 === 'number' && typeof c2 === 'number') return c2 > c1 + 2 ? t2 : t1;
+  return ocrScore(t2) > ocrScore(t1) ? t2 : t1;
+}
+async function runScanOCR(blob) {
+  var w = await getOcrWorker();
+  var r1 = await w.recognize(blob);
+  var t1 = (r1 && r1.data && r1.data.text || '').trim();
+  var best = t1;
+  try {
+    var enh = await enhanceImage(blob);
+    var r2 = await w.recognize(enh);
+    var t2 = (r2 && r2.data && r2.data.text || '').trim();
+    best = pickBetter(t1, r1 && r1.data ? r1.data.confidence : null, t2, r2 && r2.data ? r2.data.confidence : null);
+  } catch (e) {}
+  return best;
+}
+document.getElementById('scanBtn').onclick = function () { document.getElementById('scanInput').click(); };
+document.getElementById('scanInput').onchange = async function (e) {
+  var f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  setStatus('正在辨識文件…');
+  try {
+    var blob = await compressImage(f);
+    var text = (await runScanOCR(blob)).trim();
+    if (!text) { setStatus('沒有辨識出文字，請換一張更清楚的照片', true); return; }
+    var dir = detectTextLang(text);
+    if (state.dir === 'auto') { turnDir = dir; updateAutoLabels(); }
+    else { state.dir = dir; save(); applyDir(); }
+    doTranslate(text);
+  } catch (err) {
+    setStatus('辨識失敗：' + err.message + '（第一次需要連網下載辨識包）', true);
+  }
+};
+
 // ---------- recognition ----------
 var rec = null, listening = false;
 function setListening(on) {
@@ -554,6 +892,37 @@ document.getElementById('saveGroqBtn').onclick = function () {
   applyDir();
   setStatus(state.groqKey ? 'Groq 金鑰已儲存（只存在這支手機），自動辨識可以用了' : '已清除 Groq 金鑰');
 };
+document.getElementById('elKey').value = state.elKey || '';
+document.getElementById('saveElBtn').onclick = function () {
+  state.elKey = document.getElementById('elKey').value.trim();
+  save();
+  refreshVoiceUI('zh');
+  refreshVoiceUI('en');
+  if (state.elKey) { setStatus('ElevenLabs 金鑰已儲存（只存在這支手機）'); fetchElQuota(); }
+  else { document.getElementById('elQuota').textContent = ''; setStatus('已清除 ElevenLabs 金鑰'); }
+};
+['zh', 'en'].forEach(function (p) {
+  var els = voiceEls(p);
+  els.recBtn.onclick = function () { toggleVoiceRec(p); };
+  els.makeBtn.onclick = function () { makeVoice(p); };
+  els.testBtn.onclick = function () {
+    var id = p === 'zh' ? state.voiceZhId : state.voiceEnId;
+    if (id) speakTranslation(p === 'zh' ? 'Hello, this is a test of my cloned voice.' : '你好，這是複製聲音的測試。', p === 'zh' ? 'en-US' : 'zh-TW');
+  };
+  els.clearBtn.onclick = function () {
+    if (p === 'zh') state.voiceZhId = ''; else state.voiceEnId = '';
+    voiceSamples[p] = null;
+    save();
+    refreshVoiceUI(p);
+    setStatus('已清除這個聲音');
+  };
+  els.idInput.onchange = function () {
+    var v = els.idInput.value.trim();
+    if (p === 'zh') state.voiceZhId = v; else state.voiceEnId = v;
+    save();
+    refreshVoiceUI(p);
+  };
+});
 document.getElementById('saveKeyBtn').onclick = function () {
   state.apiProvider = document.getElementById('apiProvider').value;
   state.apiKey = document.getElementById('apiKey').value.trim();
@@ -576,6 +945,9 @@ document.getElementById('testBtn').onclick = async function () {
 if (state.service) document.getElementById('svcStatus').textContent = '上次使用：' + state.service;
 applyDir();
 renderHistory();
+refreshVoiceUI('zh');
+refreshVoiceUI('en');
+if (state.elKey) fetchElQuota();
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('sw.js').catch(function () {});
