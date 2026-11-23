@@ -1,4 +1,4 @@
-var CACHE = 'yiyan-v3-1';
+var CACHE = 'yiyan-v3-2';
 var ASSETS = ['index.html', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', function (e) {
