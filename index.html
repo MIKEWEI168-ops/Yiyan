@@ -183,7 +183,7 @@ footer { text-align: center; color: #bbb; font-size: 12px; margin-top: 24px; }
 </div>
 </details>
 
-<footer>譯言 v4.0 · 語音辨識與翻譯需要網路</footer>
+<footer>譯言 v4.1 · 語音辨識與翻譯需要網路</footer>
 </div>
 
 <script>
@@ -790,10 +790,16 @@ var ocrWorker = null;
 async function getOcrWorker() {
   if (ocrWorker) return ocrWorker;
   await loadTesseract();
-  ocrWorker = await Tesseract.createWorker('chi_tra+eng', 1, { logger: function (m) {
+  var logger = function (m) {
     if (m.status === 'recognizing text') setStatus('辨識中… ' + Math.round(m.progress * 100) + '%');
-    else if (m.status === 'loading tesseract core' || m.status === 'loading language traineddata') setStatus('首次使用，正在下載辨識資料…');
-  }});
+    else if (m.status === 'loading tesseract core' || m.status === 'loading language traineddata') setStatus('首次使用，正在下載辨識資料（中日英，稍等一下）…');
+  };
+  try {
+    ocrWorker = await Tesseract.createWorker('chi_tra+eng+jpn', 1, { logger: logger });
+  } catch (e) {
+    // 日文辨識包載不下來時，退回中英雙語（原本的組合），掃描功能不受影響
+    ocrWorker = await Tesseract.createWorker('chi_tra+eng', 1, { logger: logger });
+  }
   return ocrWorker;
 }
 function compressImage(file) {
@@ -844,8 +850,8 @@ function enhanceImage(blob) {
 }
 function ocrScore(text) {
   var t = text || '';
-  var cjk = (t.match(/[\u4e00-\u9fff]/g) || []).length;
-  var syms = (t.match(/[^A-Za-z0-9\u4e00-\u9fff\s]/g) || []).length;
+  var cjk = (t.match(/[\u4e00-\u9fff\u3040-\u30ff]/g) || []).length;
+  var syms = (t.match(/[^A-Za-z0-9\u4e00-\u9fff\u3040-\u30ff\s]/g) || []).length;
   var words = (t.match(/[A-Za-z]{2,}/g) || []).length;
   return cjk * 3 + words * 2 - syms * 2;
 }
