@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2a7f6f">
-<title>譯言 — 說中文，說英語</title>
+<title>譯言 — 中文、英文、西文、義文、日文</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <style>
@@ -17,6 +17,9 @@ h1 { font-size: 30px; letter-spacing: 6px; color: #2a7f6f; }
 .dir { display: flex; gap: 10px; margin-bottom: 14px; }
 .dir button { flex: 1; padding: 13px 4px; font-size: 15px; border: 2px solid #d8d2c8; background: #fff; border-radius: 14px; cursor: pointer; color: #555; }
 .dir button.active { border-color: #2a7f6f; background: #2a7f6f; color: #fff; font-weight: bold; }
+.pair { display: flex; gap: 8px; margin-bottom: 12px; }
+.pair button { flex: 1; padding: 9px 2px; font-size: 14px; border: 2px solid #d8d2c8; background: #fff; border-radius: 12px; cursor: pointer; color: #555; }
+.pair button.active { border-color: #2a7f6f; background: #2a7f6f; color: #fff; font-weight: bold; }
 .status { text-align: center; min-height: 24px; font-size: 14px; color: #8a7a5c; margin-bottom: 6px; }
 .status.err { color: #c0392b; }
 .mic-row { text-align: center; margin: 10px 0 16px; }
@@ -60,13 +63,20 @@ footer { text-align: center; color: #bbb; font-size: 12px; margin-top: 24px; }
 <div class="wrap">
 <header>
 <h1>譯言</h1>
-<div class="sub">說中文，說英語，互相聽得懂</div>
+<div class="sub">中文、英文、西班牙文、義大利文、日文，互相聽得懂</div>
 </header>
 
 <div class="dir">
 <button id="dirZhEn" class="active">中文 → English</button>
 <button id="dirEnZh">English → 中文</button>
 <button id="dirAuto">自動辨識</button>
+</div>
+
+<div class="pair">
+<button id="pairEn" class="active">中-英</button>
+<button id="pairEs">中-西</button>
+<button id="pairIt">中-義</button>
+<button id="pairJa">中-日</button>
 </div>
 
 <div class="status" id="status">準備好了，點麥克風開始說話</div>
@@ -146,7 +156,7 @@ footer { text-align: center; color: #bbb; font-size: 12px; margin-top: 24px; }
 <div class="note">錄樣本：說中文，至少 30 秒，最好 1 分鐘，清楚自然就好。</div>
 </div>
 <div class="set-row">
-<label>英文說話者的聲音（翻成中文時，用這個聲音唸）</label>
+<label>外語說話者的聲音（翻成中文時，用這個聲音唸）</label>
 <div id="voiceEnStatus" class="note">尚未建立</div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
 <button id="recEnBtn">🎙️ 錄聲音樣本</button>
@@ -155,7 +165,7 @@ footer { text-align: center; color: #bbb; font-size: 12px; margin-top: 24px; }
 <button id="clearEnBtn" disabled>清除</button>
 </div>
 <input type="text" id="voiceEnId" placeholder="或直接貼上 voice_id（在 ElevenLabs 網站建立的）" style="margin-top:8px;">
-<div class="note">錄樣本：說英文，至少 30 秒，最好 1 分鐘，清楚自然就好。</div>
+<div class="note">錄樣本：說外語（英文、西班牙文、義大利文或日文皆可），至少 30 秒，最好 1 分鐘，清楚自然就好。</div>
 </div>
 <div class="set-row">
 <label>翻譯 API 金鑰（選填，免費服務不通時用）</label>
@@ -173,17 +183,47 @@ footer { text-align: center; color: #bbb; font-size: 12px; margin-top: 24px; }
 </div>
 </details>
 
-<footer>譯言 v3.3 · 語音辨識與翻譯需要網路</footer>
+<footer>譯言 v4.0 · 語音辨識與翻譯需要網路</footer>
 </div>
 
 <script>
 var LS_KEY = 'yiyan_v1';
-var state = { dir: 'zh-en', autoSpeak: true, rate: 1.0, apiProvider: '', apiKey: '', groqKey: '', elKey: '', voiceZhId: '', voiceEnId: '', service: '', history: [] };
+var state = { dir: 'zh-en', pair: 'en', autoSpeak: true, rate: 1.0, apiProvider: '', apiKey: '', groqKey: '', elKey: '', voiceZhId: '', voiceEnId: '', service: '', history: [] };
 var turnDir = 'zh-en'; // auto 模式下，本輪辨識出的實際方向
 var lastDir = null; // 上一次翻譯的實際方向（結果卡片的標籤跟著它，不跟目前按鈕）
 var lastDstLang = null; // 上一次翻譯的目標語言（再說一次用）
 try { var saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}'); for (var k in saved) { if (k in state) state[k] = saved[k]; } } catch (e) {}
 function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
+
+// ---------- 語言對：中文 + 一種外語 ----------
+var LANGS = {
+  en: { name: 'English', short: '英', said: 'You said', rec: 'en-US', tts: 'en-US', gtx: 'en', deepl: 'EN', sample: 'Hello, I would like to go to the train station' },
+  es: { name: 'Español', short: '西', said: 'Dijiste', rec: 'es-ES', tts: 'es-ES', gtx: 'es', deepl: 'ES', sample: 'Hola, me gustaría ir a la estación de tren' },
+  it: { name: 'Italiano', short: '義', said: 'Hai detto', rec: 'it-IT', tts: 'it-IT', gtx: 'it', deepl: 'IT', sample: 'Ciao, vorrei andare alla stazione' },
+  ja: { name: '日本語', short: '日', said: 'あなたの言葉', rec: 'ja-JP', tts: 'ja-JP', gtx: 'ja', deepl: 'JA', sample: 'こんにちは、駅に行きたいです' }
+};
+function pairLang() { return LANGS[state.pair] || LANGS.en; }
+function foreignCode() { var p = effDir().split('-'); return p[0] === 'zh' ? p[1] : p[0]; }
+function foreignLang() { return LANGS[foreignCode()] || LANGS.en; }
+function remapDir(d, p) {
+  if (!d || d === 'auto') return d;
+  if (d.indexOf('zh-') === 0) return 'zh-' + p;
+  return p + '-zh';
+}
+function setPair(p) {
+  if (!LANGS[p] || state.pair === p) return;
+  state.pair = p;
+  state.dir = remapDir(state.dir, p);
+  turnDir = remapDir(turnDir, p);
+  save();
+  applyDir();
+}
+function updatePairButtons() {
+  document.getElementById('pairEn').className = state.pair === 'en' ? 'active' : '';
+  document.getElementById('pairEs').className = state.pair === 'es' ? 'active' : '';
+  document.getElementById('pairIt').className = state.pair === 'it' ? 'active' : '';
+  document.getElementById('pairJa').className = state.pair === 'ja' ? 'active' : '';
+}
 
 var statusEl = document.getElementById('status');
 var srcTextEl = document.getElementById('srcText');
@@ -203,9 +243,9 @@ function setService(name) {
   save();
 }
 function effDir() { return state.dir === 'auto' ? turnDir : state.dir; }
-function zhEn() { return effDir() === 'zh-en'; }
-function srcLang() { return zhEn() ? 'zh-TW' : 'en-US'; }
-function dstLang() { return zhEn() ? 'en-US' : 'zh-TW'; }
+function zhEn() { return effDir().indexOf('zh-') === 0; }
+function srcLang() { return zhEn() ? 'zh-TW' : foreignLang().rec; }
+function dstLang() { return zhEn() ? foreignLang().tts : 'zh-TW'; }
 function updateResultLabels() {
   var d = lastDir || effDir();
   if (!lastDir && state.dir === 'auto') {
@@ -213,8 +253,11 @@ function updateResultLabels() {
     document.getElementById('dstLabel').textContent = '翻譯';
     return;
   }
-  document.getElementById('srcLabel').textContent = d === 'zh-en' ? '你說的（中文）' : 'You said (English)';
-  document.getElementById('dstLabel').textContent = d === 'zh-en' ? '翻譯（English）' : '翻譯（中文）';
+  var fp = d.split('-'); var fc = fp[0] === 'zh' ? fp[1] : fp[0];
+  var fl = LANGS[fc] || LANGS.en;
+  var zhFirst = d.indexOf('zh-') === 0;
+  document.getElementById('srcLabel').textContent = zhFirst ? '你說的（中文）' : fl.said + ' (' + fl.name + ')';
+  document.getElementById('dstLabel').textContent = zhFirst ? '翻譯（' + fl.name + '）' : '翻譯（中文）';
 }
 function updateAutoLabels() {
   if (state.dir !== 'auto') return;
@@ -222,21 +265,29 @@ function updateAutoLabels() {
 }
 
 function applyDir() {
-  document.getElementById('dirZhEn').className = state.dir === 'zh-en' ? 'active' : '';
-  document.getElementById('dirEnZh').className = state.dir === 'en-zh' ? 'active' : '';
+  var pl = pairLang();
+  document.getElementById('dirZhEn').textContent = '中文 → ' + pl.name;
+  document.getElementById('dirEnZh').textContent = pl.name + ' → 中文';
+  document.getElementById('dirZhEn').className = state.dir === 'zh-' + state.pair ? 'active' : '';
+  document.getElementById('dirEnZh').className = state.dir === state.pair + '-zh' ? 'active' : '';
   document.getElementById('dirAuto').className = state.dir === 'auto' ? 'active' : '';
+  updatePairButtons();
   updateResultLabels();
   if (state.dir === 'auto') {
     document.getElementById('typeInput').placeholder = '或直接打字（自動辨識語言）…';
-    setStatus(state.groqKey ? '自動辨識：說中文或英語都可以' : '自動辨識需要免費的 Groq 金鑰，請在設定裡填入');
+    setStatus(state.groqKey ? '自動辨識：說中文或' + pl.name + '都可以' : '自動辨識需要免費的 Groq 金鑰，請在設定裡填入');
   } else {
-    document.getElementById('typeInput').placeholder = zhEn() ? '或直接打中文翻譯…' : 'Or type English here…';
+    document.getElementById('typeInput').placeholder = zhEn() ? '或直接打中文翻譯…' : '或直接打' + pl.name + '翻譯…';
     setStatus('準備好了，點麥克風開始說話');
   }
 }
-document.getElementById('dirZhEn').onclick = function () { state.dir = 'zh-en'; save(); applyDir(); };
-document.getElementById('dirEnZh').onclick = function () { state.dir = 'en-zh'; save(); applyDir(); };
+document.getElementById('dirZhEn').onclick = function () { state.dir = 'zh-' + state.pair; save(); applyDir(); };
+document.getElementById('dirEnZh').onclick = function () { state.dir = state.pair + '-zh'; save(); applyDir(); };
 document.getElementById('dirAuto').onclick = function () { state.dir = 'auto'; save(); applyDir(); };
+document.getElementById('pairEn').onclick = function () { setPair('en'); };
+document.getElementById('pairEs').onclick = function () { setPair('es'); };
+document.getElementById('pairIt').onclick = function () { setPair('it'); };
+document.getElementById('pairJa').onclick = function () { setPair('ja'); };
 
 // ---------- translation ----------
 function fetchTimeout(url, opts, ms) {
@@ -304,18 +355,19 @@ function fin(t) { return zhEn() ? t : s2t(t); }
 async function translate(text) {
   var errors = [];
   var z = zhEn();
+  var fl = foreignLang();
   if (state.apiKey && state.apiProvider === 'deepl') {
-    try { var t = await trDeepL(text, z ? 'ZH' : 'EN', z ? 'EN-US' : 'ZH-HANT', state.apiKey); setService('DeepL'); return fin(t); }
+    try { var t = await trDeepL(text, z ? 'ZH' : fl.deepl, z ? (fl.deepl === 'EN' ? 'EN-US' : fl.deepl) : 'ZH-HANT', state.apiKey); setService('DeepL'); return fin(t); }
     catch (e) { errors.push('DeepL：' + e.message); }
   }
   if (state.apiKey && state.apiProvider === 'google') {
-    try { var t2 = await trGoogleAPI(text, z ? 'zh-TW' : 'en', z ? 'en' : 'zh-TW', state.apiKey); setService('Google 翻譯 API'); return fin(t2); }
+    try { var t2 = await trGoogleAPI(text, z ? 'zh-TW' : fl.gtx, z ? fl.gtx : 'zh-TW', state.apiKey); setService('Google 翻譯 API'); return fin(t2); }
     catch (e) { errors.push('Google API：' + e.message); }
   }
   var chain = [
-    ['Google 翻譯', function () { return trGoogle(text, z ? 'zh-TW' : 'en', z ? 'en' : 'zh-TW'); }],
-    ['MyMemory', function () { return trMyMemory(text, z ? 'zh-TW' : 'en', z ? 'en' : 'zh-TW'); }],
-    ['LibreTranslate', function () { return trLibre(text, z ? 'zh' : 'en', z ? 'en' : 'zh'); }]
+    ['Google 翻譯', function () { return trGoogle(text, z ? 'zh-TW' : fl.gtx, z ? fl.gtx : 'zh-TW'); }],
+    ['MyMemory', function () { return trMyMemory(text, z ? 'zh-TW' : fl.gtx, z ? fl.gtx : 'zh-TW'); }],
+    ['LibreTranslate', function () { return trLibre(text, z ? 'zh' : fl.gtx, z ? fl.gtx : 'zh'); }]
   ];
   for (var i = 0; i < chain.length; i++) {
     try { var out = await chain[i][1](); setService(chain[i][0]); return fin(out); }
@@ -339,7 +391,12 @@ function s2t(text) {
 function pickVoice(lang) {
   if (!('speechSynthesis' in window)) return null;
   var voices = speechSynthesis.getVoices() || [];
-  var prefs = lang.indexOf('zh') === 0 ? ['zh-TW', 'zh-HK', 'zh-CN', 'zh'] : ['en-US', 'en-GB', 'en'];
+  var base = lang.split('-')[0].toLowerCase();
+  var prefs = base === 'zh' ? ['zh-TW', 'zh-HK', 'zh-CN', 'zh']
+    : base === 'es' ? ['es-ES', 'es-MX', 'es-US', 'es']
+    : base === 'it' ? ['it-IT', 'it']
+    : base === 'ja' ? ['ja-JP', 'ja']
+    : ['en-US', 'en-GB', 'en'];
   for (var i = 0; i < prefs.length; i++) {
     for (var j = 0; j < voices.length; j++) {
       if (voices[j].lang && voices[j].lang.toLowerCase().indexOf(prefs[i].toLowerCase()) === 0) return voices[j];
@@ -394,7 +451,7 @@ async function elTTS(text, voiceId) {
   return await res.blob();
 }
 async function speakTranslation(text, lang) {
-  var voiceId = lang.indexOf('en') === 0 ? state.voiceZhId : state.voiceEnId;
+  var voiceId = lang.indexOf('zh') === 0 ? state.voiceEnId : state.voiceZhId; // 譯文是中文 → 外語說話者的聲音；譯文是外語 → 中文說話者的聲音
   if (state.elKey && voiceId) {
     try {
       var blob = await elTTS(text, voiceId);
@@ -521,7 +578,7 @@ async function makeVoice(p) {
   els.makeBtn.disabled = true;
   try {
     var fd = new FormData();
-    fd.append('name', p === 'zh' ? '譯言-中文說話者' : '譯言-英文說話者');
+    fd.append('name', p === 'zh' ? '譯言-中文說話者' : '譯言-外語說話者');
     fd.append('files', voiceSamples[p], 'sample.wav');
     fd.append('description', 'Created in 譯言 app');
     var res = await fetchTimeout('https://api.elevenlabs.io/v1/voices/add', {
@@ -547,7 +604,8 @@ async function makeVoice(p) {
 
 // ---------- flow ----------
 function showSource(text, interim) {
-  srcTextEl.textContent = s2t(text);
+  // 只有中文原文才轉繁體；日文原文不能經過簡轉繁
+  srcTextEl.textContent = effDir().indexOf('zh-') === 0 ? s2t(text) : text;
   srcTextEl.className = 'text' + (interim ? ' interim' : '');
 }
 function showDst(text) {
@@ -592,9 +650,12 @@ function renderHistory() {
     d.className = 'hist-item';
     var time = new Date(h.t);
     var ts = (time.getMonth() + 1) + '/' + time.getDate() + ' ' + ('0' + time.getHours()).slice(-2) + ':' + ('0' + time.getMinutes()).slice(-2);
-    var hd = (h.dir === 'zh-en' || h.dir === 'en-zh') ? h.dir : detectTextLang(h.src); // 舊記錄存的是 auto，依原文補推方向
-    d.innerHTML = '<div class="s">' + esc(s2t(h.src)) + '</div><div class="d">→ ' + esc(s2t(h.dst)) + '</div><div class="t">' + (hd === 'zh-en' ? '中 → 英' : '英 → 中') + ' · ' + ts + '</div>';
-    d.onclick = function () { speakTranslation(h.dst, hd === 'zh-en' ? 'en-US' : 'zh-TW'); };
+    var hd = (/^zh-[a-z]{2}$/.test(h.dir) || /^[a-z]{2}-zh$/.test(h.dir)) ? h.dir : detectTextLang(h.src); // 舊記錄存的是 auto，依原文補推方向
+    var hp = hd.split('-'); var hfc = hp[0] === 'zh' ? hp[1] : hp[0];
+    var hfl = LANGS[hfc] || LANGS.en;
+    var hSrcIsZh = hd.indexOf('zh-') === 0;
+    d.innerHTML = '<div class="s">' + esc(hSrcIsZh ? s2t(h.src) : h.src) + '</div><div class="d">→ ' + esc(hSrcIsZh ? h.dst : s2t(h.dst)) + '</div><div class="t">' + (hSrcIsZh ? '中 → ' + hfl.short : hfl.short + ' → 中') + ' · ' + ts + '</div>';
+    d.onclick = function () { speakTranslation(h.dst, hSrcIsZh ? hfl.tts : 'zh-TW'); };
     box.appendChild(d);
   });
 }
@@ -602,7 +663,10 @@ function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').
 
 // ---------- auto-detect mode (Groq Whisper) ----------
 function detectTextLang(text) {
-  return /[\u4e00-\u9fff]/.test(text) ? 'zh-en' : 'en-zh';
+  var p = (typeof state !== 'undefined' && state.pair) || 'en';
+  if (/[\u3040-\u30ff]/.test(text)) return 'ja-zh'; // 日文假名：一定是日文
+  if (/[\u4e00-\u9fff]/.test(text)) return 'zh-' + p;
+  return p + '-zh';
 }
 async function transcribeGroq(blob) {
   var fd = new FormData();
@@ -867,7 +931,7 @@ micBtn.onclick = function () {
   try {
     rec.start();
     setListening(true);
-    setStatus('正在聽…（' + (zhEn() ? '中文' : 'English') + '）');
+    setStatus('正在聽…（' + (zhEn() ? '中文' : foreignLang().name) + '）');
     showSource('…', true);
   } catch (e) { setStatus('無法開始辨識：' + e.message, true); }
 };
@@ -940,7 +1004,7 @@ document.getElementById('saveKeyBtn').onclick = function () {
 };
 document.getElementById('clearHistBtn').onclick = function () { state.history = []; save(); renderHistory(); setStatus('記錄已清除'); };
 document.getElementById('testBtn').onclick = async function () {
-  var sample = zhEn() ? '你好，我想去火車站' : 'Hello, I would like to go to the train station';
+  var sample = zhEn() ? '你好，我想去火車站' : foreignLang().sample;
   document.getElementById('svcStatus').textContent = '測試中…';
   try {
     var out = await translate(sample);
@@ -951,6 +1015,7 @@ document.getElementById('testBtn').onclick = async function () {
 };
 
 // ---------- init ----------
+if (state.dir === 'auto') turnDir = remapDir(turnDir, state.pair); // 舊存檔的 turnDir 可能是別的語言對
 if (state.service) document.getElementById('svcStatus').textContent = '上次使用：' + state.service;
 applyDir();
 renderHistory();
