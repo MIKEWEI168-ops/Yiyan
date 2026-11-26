@@ -173,7 +173,7 @@ footer { text-align: center; color: #bbb; font-size: 12px; margin-top: 24px; }
 </div>
 </details>
 
-<footer>譯言 v3.2 · 語音辨識與翻譯需要網路</footer>
+<footer>譯言 v3.3 · 語音辨識與翻譯需要網路</footer>
 </div>
 
 <script>
@@ -578,7 +578,7 @@ async function doTranslate(text) {
   }
 }
 function addHistory(src, dst) {
-  state.history.unshift({ dir: state.dir, src: src, dst: dst, t: Date.now() });
+  state.history.unshift({ dir: effDir(), src: src, dst: dst, t: Date.now() });
   if (state.history.length > 30) state.history.length = 30;
   save();
   renderHistory();
@@ -592,21 +592,15 @@ function renderHistory() {
     d.className = 'hist-item';
     var time = new Date(h.t);
     var ts = (time.getMonth() + 1) + '/' + time.getDate() + ' ' + ('0' + time.getHours()).slice(-2) + ':' + ('0' + time.getMinutes()).slice(-2);
-    d.innerHTML = '<div class="s">' + esc(s2t(h.src)) + '</div><div class="d">→ ' + esc(s2t(h.dst)) + '</div><div class="t">' + (h.dir === 'zh-en' ? '中 → 英' : '英 → 中') + ' · ' + ts + '</div>';
-    d.onclick = function () { speakTranslation(h.dst, h.dir === 'zh-en' ? 'en-US' : 'zh-TW'); };
+    var hd = (h.dir === 'zh-en' || h.dir === 'en-zh') ? h.dir : detectTextLang(h.src); // 舊記錄存的是 auto，依原文補推方向
+    d.innerHTML = '<div class="s">' + esc(s2t(h.src)) + '</div><div class="d">→ ' + esc(s2t(h.dst)) + '</div><div class="t">' + (hd === 'zh-en' ? '中 → 英' : '英 → 中') + ' · ' + ts + '</div>';
+    d.onclick = function () { speakTranslation(h.dst, hd === 'zh-en' ? 'en-US' : 'zh-TW'); };
     box.appendChild(d);
   });
 }
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
 // ---------- auto-detect mode (Groq Whisper) ----------
-function mapDetectedLang(lang) {
-  if (!lang) return null;
-  var l = String(lang).toLowerCase();
-  if (l === 'zh' || l === 'chinese' || l === 'mandarin' || l.indexOf('zh') === 0) return 'zh-en';
-  if (l === 'en' || l === 'english' || l.indexOf('en') === 0) return 'en-zh';
-  return null;
-}
 function detectTextLang(text) {
   return /[\u4e00-\u9fff]/.test(text) ? 'zh-en' : 'en-zh';
 }
@@ -698,13 +692,14 @@ async function autoListenToggle() {
     try {
       var result = await transcribeGroq(blob);
       var text = (result.text || '').trim();
-      var dir = mapDetectedLang(result.language);
       if (!text) { setStatus('沒聽到聲音，再試一次'); return; }
-      if (!dir) { showSource(text, false); setStatus('聽到的是「' + (result.language || '未知語言') + '」，目前只支援中文和英語', true); return; }
-      turnDir = dir;
+      // 以辨識出的文字內容判斷語言：短句時 Whisper 的語言標籤常誤判（英語判成中文）
+      turnDir = detectTextLang(text);
       updateAutoLabels();
       doTranslate(text);
     } catch (e) {
+      dstTextEl.textContent = '—'; // 清掉上一輪的翻譯，免得看起來像這句的翻譯
+      dstTextEl.className = 'text placeholder';
       setStatus('辨識失敗：' + e.message + '（請檢查 Groq 金鑰與網路）', true);
     }
   };
